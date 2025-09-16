@@ -32,11 +32,18 @@ Production-ready FastAPI backend providing:
 
 ## Run locally
 
-1) Ensure environment variables are set (see `.env.example`).
+1) Ensure environment variables are set (see `.env.example`). You can create a local `.env` file at the backend root; the app auto-loads it.
 2) Install dependencies:
    pip install -r requirements.txt
 3) Start API:
    uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+## Health and troubleshooting
+
+- Visit `/` to see health and configuration status summary (booleans only, secrets are not logged).
+- If the preview says "having trouble connecting", ensure required env vars are provided (either via orchestrator or `.env`).
+- Logs will report missing required variables at startup.
+- Registration uses Supabase Auth signup with `options.emailRedirectTo` set to `${SITE_URL}/auth/callback`.
 
 ## OpenAPI JSON
 Regenerate interfaces/openapi.json by running:

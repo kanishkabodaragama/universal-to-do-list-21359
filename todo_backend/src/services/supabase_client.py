@@ -29,9 +29,10 @@ class SupabaseClient:
             "apikey": self.anon_key,
             "Content-Type": "application/json",
         }
-        payload = {"email": email, "password": password}
+        payload: Dict[str, Any] = {"email": email, "password": password}
         if email_redirect_to:
-            payload["data"] = {"email_redirect_to": email_redirect_to}
+            # Supabase expects options.emailRedirectTo
+            payload["options"] = {"emailRedirectTo": email_redirect_to}
         resp = await self._client.post(f"{self.auth_url}/signup", headers=headers, json=payload)
         if resp.status_code >= 400:
             logger.error(f"Supabase signup error: {resp.status_code} {resp.text}")
@@ -46,6 +47,7 @@ class SupabaseClient:
         payload = {"email": email, "password": password}
         resp = await self._client.post(f"{self.auth_url}/token?grant_type=password", headers=headers, json=payload)
         if resp.status_code >= 400:
+            logger.error(f"Supabase sign-in error: {resp.status_code} {resp.text}")
             return {}
         return resp.json()
 
@@ -65,6 +67,7 @@ class SupabaseClient:
             return False
         users = users_resp.json().get("users") or []
         if not users:
+            logger.error("User not found for password update")
             return False
         user_id = users[0]["id"]
         update_resp = await self._client.put(
@@ -72,6 +75,8 @@ class SupabaseClient:
             headers=headers,
             json={"password": new_password},
         )
+        if update_resp.status_code >= 400:
+            logger.error(f"Admin user update error: {update_resp.status_code} {update_resp.text}")
         return update_resp.status_code < 400
 
     # ---- Database (REST) ----

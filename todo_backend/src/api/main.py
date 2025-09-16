@@ -13,6 +13,7 @@ from src.core.logging import get_logger
 from src.services.supabase_client import get_supabase_client
 from src.services.user_service import UserService
 from src.services.todo_service import TodoService
+from src.api.docs_info import get_docs_router
 from src.models.schemas import (
     Token,
     TokenData,
@@ -48,6 +49,16 @@ def create_app() -> FastAPI:
         ],
     )
 
+    logger = get_logger()
+
+    # Validate required configuration and log diagnostics
+    missing = [name for name, ok in settings.validate_required() if not ok]
+    if missing:
+        logger.error(
+            "Missing required environment variables: %s",
+            ", ".join(missing),
+        )
+
     # CORS
     app.add_middleware(
         CORSMiddleware,
@@ -57,7 +68,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    logger = get_logger()
+    # Mount docs helper router
+    app.include_router(get_docs_router())
 
     # Security components
     oauth2_scheme = OAuth2PasswordBearer(
@@ -129,7 +141,31 @@ def create_app() -> FastAPI:
 
     @app.get("/", tags=["health"], summary="Health Check", description="Returns service health status and timestamp.")
     def health_check():
-        return {"message": "Healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+        cfg_status = {
+            "SUPABASE_URL_set": bool(settings.SUPABASE_URL),
+            "SUPABASE_ANON_KEY_set": bool(settings.SUPABASE_ANON_KEY),
+            "SUPABASE_SERVICE_ROLE_KEY_set": bool(settings.SUPABASE_SERVICE_ROLE_KEY),
+            "JWT_secret_set": bool(settings.JWT_SECRET_KEY and settings.JWT_SECRET_KEY != "change-me"),
+            "SITE_URL_set": bool(settings.SITE_URL),
+        }
+        return {"message": "Healthy", "timestamp": datetime.now(timezone.utc).isoformat(), "config": cfg_status}
+
+    @app.get(
+        "/health/config",
+        tags=["health"],
+        summary="Configuration diagnostics",
+        description="Returns configuration readiness flags for required environment variables (no secrets).",
+    )
+    def health_config():
+        cfg_status = {
+            "SUPABASE_URL_set": bool(settings.SUPABASE_URL),
+            "SUPABASE_ANON_KEY_set": bool(settings.SUPABASE_ANON_KEY),
+            "SUPABASE_SERVICE_ROLE_KEY_set": bool(settings.SUPABASE_SERVICE_ROLE_KEY),
+            "JWT_secret_set": bool(settings.JWT_SECRET_KEY and settings.JWT_SECRET_KEY != "change-me"),
+            "JWT_algorithm_set": bool(settings.JWT_ALGORITHM),
+            "SITE_URL_set": bool(settings.SITE_URL),
+        }
+        return {"config": cfg_status}
 
     @app.post(
         "/auth/register",
